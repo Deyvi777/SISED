@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SISED - Sistema de Evaluación Docente 🖥️📝
 
-## Getting Started
+SISED es una plataforma web moderna diseñada para la creación, gestión y toma de evaluaciones en entornos educativos locales. Está optimizada para ejecutarse eficientemente en redes locales (LAN) y ofrece total compatibilidad con computadoras y navegadores antiguos (ej. Chrome 109 / Windows 7).
 
-First, run the development server:
 
+## 🚀 Características Principales
+
+- **Gestión de Evaluaciones:** Creación de exámenes con múltiples tipos de preguntas (opción múltiple, completar espacios, respuesta abierta).
+- **Módulo de Gamificación:** Juegos educativos e interactivos (ej: Clasificación de Hardware) con persistencia de puntajes y límites de intentos configurables por curso.
+- **Exportación de Reportes:** Descarga directa de resultados y progreso de los alumnos en formato Excel (`.xlsx`).
+- **Padrón de Estudiantes:** Directorio completo de alumnos por curso.
+- **Optimización LAN:** Carga rápida y estabilidad de red sin depender de internet.
+
+---
+
+## 🛠️ Stack Tecnológico
+
+- **Framework:** [Next.js](https://nextjs.org/) (App Router)
+- **Lenguaje:** TypeScript
+- **Base de Datos:** SQLite (Local y Ligero)
+- **ORM:** Prisma
+- **Estilos:** CSS Vanilla / Módulos CSS (Garantía de compatibilidad sin dependencias pesadas).
+
+---
+
+## 💻 Requisitos de Instalación
+
+1. **Node.js** (Versión 18 o superior recomendada).
+2. Un gestor de paquetes (`npm` o `pnpm`).
+
+---
+
+## ⚙️ Guía de Inicio Rápido (Instalación limpia)
+
+Sigue estos pasos cuando clones el repositorio por primera vez:
+
+### 1. Instalar dependencias
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+# o
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Inicializar la base de datos vacía
+Este comando generará el archivo `.env`, creará un archivo de base de datos limpio (`dev.db`) y preparará el cliente Prisma:
+```bash
+npm run db:init
+# o
+pnpm db:init
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏃 Modo de Ejecución
 
-## Learn More
+### En Desarrollo (Para programadores)
+```bash
+npm run dev
+# o
+pnpm dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+### En Producción (Recomendado para Red Local / LAN)
+Para que los alumnos no experimenten fallos de conexión por HMR en navegadores antiguos:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. **Compilar el proyecto:**
+   ```bash
+   npm run build
+   # o
+   pnpm build
+   ```
+2. **Arrancar el servidor expuesto a la LAN:**
+   ```bash
+   npm run start
+   # o
+   pnpm start
+   ```
+   *Nota: Esto abrirá el puerto `3000` accesible en toda la red local mediante la IP de tu servidor (ej. `http://192.168.1.15:3000`).*

@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Student {
+  id         String    @id @default(uuid())
+  fullName   String
+  email      String?   @unique
+  studentId  String    @unique
+  ci         String?   @unique
+  gender     String?
+  course     String?
+  birthDate  DateTime?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  listNumber Int?
+}
+
+model Teacher {
+  id          String       @id @default(uuid())
+  name        String
+  email       String       @unique
+  password    String
+  subject     String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  evaluations Evaluation[]
+}
+
+model Evaluation {
+  id                    String             @id @default(uuid())
+  title                 String
+  duration              Int
+  teacherId             String
+  allowMultipleAttempts Boolean            @default(false)
+  showScoreAtEnd        Boolean            @default(true)
+  showCorrectAnswers    Boolean            @default(false)
+  shuffleQuestions      Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  teacher               Teacher            @relation(fields: [teacherId], references: [id])
+  courses               EvaluationCourse[]
+  questions             Question[]
+  results               StudentResult[]
+}
+
+model EvaluationCourse {
+  id           String     @id @default(uuid())
+  courseName   String
+  evaluationId String
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id])
+}
+
+model Question {
+  id            String     @id @default(uuid())
+  type          String
+  content       String
+  options       String?
+  correctAnswer String
+  points        Float      @default(1.0)
+  evaluationId  String
+  evaluation    Evaluation @relation(fields: [evaluationId], references: [id])
+}
+
+model StudentResult {
+  id           String     @id @default(uuid())
+  studentId    String?
+  studentName  String
+  listNumber   Int?
+  courseName   String?
+  score        Float
+  evaluationId String
+  completedAt  DateTime   @default(now())
+  evaluation   Evaluation @relation(fields: [evaluationId], references: [id])
+}
+model GameConfig {
+  id          String   @id @default(uuid())
+  gameId      String
+  courseName  String
+  maxAttempts Int      @default(3)
+  isActive    Boolean  @default(true)
+  maxPoints   Int      @default(45)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([gameId, courseName])
+}
+
+model GameScore {
+  id           String   @id @default(uuid())
+  gameId       String
+  studentName  String
+  courseName   String
+  score        Int
+  levelReached Int
+  attemptsUsed Int      @default(1)
+  completedAt  DateTime @default(now())
+}
