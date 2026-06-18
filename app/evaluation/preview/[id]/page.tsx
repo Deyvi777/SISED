@@ -7,7 +7,7 @@ import { getEvaluationById } from '@/app/actions'
 
 export default function PreviewEvaluation({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const [evaluation, setEvaluation] = useState<{title: string, duration: number, questions: {id: string, content: string, type: string, options?: string | null, correctAnswer: string}[]} | null>(null)
+  const [evaluation, setEvaluation] = useState<{title: string, duration: number, questions: {id: string, content: string, type: string, options?: string | null, correctAnswer: string, shuffledOptions?: string[]}[]} | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -15,7 +15,14 @@ export default function PreviewEvaluation({ params }: { params: Promise<{ id: st
     async function loadData() {
       const ev = await getEvaluationById(id)
       if (ev) {
-        setEvaluation(ev)
+        const qs = ev.questions.map(q => {
+          let shuffledOptions: string[] | undefined = undefined;
+          if (q.type === 'MULTIPLE_CHOICE' && q.options) {
+            shuffledOptions = q.options.split(',').map(o => o.trim()).sort(() => Math.random() - 0.5)
+          }
+          return { ...q, shuffledOptions }
+        })
+        setEvaluation({ ...ev, questions: qs })
       } else {
         alert('Evaluación no encontrada')
         router.push('/dashboard')
@@ -46,7 +53,7 @@ export default function PreviewEvaluation({ params }: { params: Promise<{ id: st
             Simulación de Examen
           </div>
 
-          {evaluation.questions.map((q: {id: string, content: string, type: string, options?: string | null, correctAnswer: string}, index: number) => (
+          {evaluation.questions.map((q: {id: string, content: string, type: string, options?: string | null, correctAnswer: string, shuffledOptions?: string[]}, index: number) => (
             <div key={q.id} style={{ marginBottom: '2.5rem', padding: '2rem', background: 'white', border: '1px solid var(--card-border)', borderRadius: '20px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.02)' }}>
               <div style={{ display: 'flex', gap: '1.25rem', marginBottom: '1.5rem' }}>
                 <div style={{ width: '36px', height: '36px', background: 'var(--primary)', color: 'white', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', flexShrink: 0, fontSize: '1.1rem' }}>
@@ -60,12 +67,12 @@ export default function PreviewEvaluation({ params }: { params: Promise<{ id: st
                 </div>
               </div>
 
-              {q.type === 'MULTIPLE_CHOICE' && q.options && (
+              {q.type === 'MULTIPLE_CHOICE' && q.shuffledOptions && (
                 <div style={{ display: 'grid', gap: '0.75rem', marginLeft: '3.25rem' }}>
-                  {q.options.split(',').map((opt: string, i: number) => (
+                  {q.shuffledOptions.map((opt: string, i: number) => (
                     <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.2s', color: '#374151', fontWeight: '500' }}>
                       <input type="radio" name={`q-${q.id}`} style={{ width: '18px', height: '18px', accentColor: 'var(--primary)' }} />
-                      {opt.trim()}
+                      {opt}
                     </label>
                   ))}
                 </div>

@@ -1,7 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { getStudentsByCourse, getCourses, getEvaluationsByCourse, validateStudentPassword, getGameConfigs, getGameScoreForStudent } from './actions'
+import { getStudentsByCourse, getCourses, getEvaluationsByCourse, validateStudentPassword, getGameConfigs, getGameScoreForStudent, getStudentHistory, getCourseRanking } from './actions'
+import StudentHistory from './components/StudentHistory'
+import CourseRanking from './components/CourseRanking'
+import type { EvalHistoryItem, GameHistoryItem } from './components/StudentHistory'
+import type { EvalRankingItem, GameRankingItem } from './components/CourseRanking'
 import Link from 'next/link'
 
 interface StudentData {
@@ -17,6 +21,7 @@ interface Evaluation {
   results?: { studentName: string, score: number }[]
   totalPossible?: number
   allowMultipleAttempts?: boolean
+  isActive: boolean
 }
 
 export default function Home() {
@@ -38,6 +43,11 @@ export default function Home() {
   const [gameConfig, setGameConfig] = useState<{ maxAttempts: number, isActive: boolean } | null>(null)
   const [gameScore, setGameScore] = useState<{ score: number, levelReached: number, attemptsUsed: number } | null>(null)
 
+  // New states for Tabs, History and Ranking
+  const [activeTab, setActiveTab] = useState<'evaluations' | 'history' | 'ranking'>('evaluations')
+  const [historyData, setHistoryData] = useState<{ evaluations: EvalHistoryItem[], games: GameHistoryItem[] }>({ evaluations: [], games: [] })
+  const [rankingData, setRankingData] = useState<{ evalRanking: EvalRankingItem[], gameRanking: GameRankingItem[] }>({ evalRanking: [], gameRanking: [] })
+
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -57,8 +67,8 @@ export default function Home() {
           setSelectedCourse(session.course)
           setSelectedStudent(session.student)
           
-          const evals = await getEvaluationsByCourse(session.course)
-          setAvailableEvaluations(evals as unknown as Evaluation[])
+          const evals = await getEvaluationsByCourse(session.course) as unknown as Evaluation[]
+          setAvailableEvaluations(evals.filter(e => e.isActive))
 
           const configs = await getGameConfigs('hardware_classification')
           const courseConfig = configs.find(c => c.courseName === session.course)
@@ -78,6 +88,13 @@ export default function Home() {
           } else {
             setGameScore(null)
           }
+
+          const [hist, rank] = await Promise.all([
+            getStudentHistory(session.student.fullName, session.course),
+            getCourseRanking(session.course)
+          ])
+          setHistoryData(hist)
+          setRankingData(rank)
         }
       } catch (err) {
         console.error('Error al cargar cursos:', err)
@@ -140,8 +157,8 @@ export default function Home() {
           course: selectedCourse
         }))
 
-        const evals = await getEvaluationsByCourse(selectedCourse)
-        setAvailableEvaluations(evals as unknown as Evaluation[])
+        const evals = await getEvaluationsByCourse(selectedCourse) as unknown as Evaluation[]
+        setAvailableEvaluations(evals.filter(e => e.isActive))
 
         // Fetch Game config & score
         const configs = await getGameConfigs('hardware_classification')
@@ -162,10 +179,17 @@ export default function Home() {
         } else {
           setGameScore(null)
         }
+
+        const [hist, rank] = await Promise.all([
+          getStudentHistory(studentToAuth.fullName, selectedCourse),
+          getCourseRanking(selectedCourse)
+        ])
+        setHistoryData(hist)
+        setRankingData(rank)
       } else {
         setAuthError(res.error || 'Contraseña incorrecta.')
       }
-    } catch (err) {
+    } catch {
       setAuthError('Error al validar la contraseña.')
     } finally {
       setIsAuthenticating(false)
@@ -175,6 +199,7 @@ export default function Home() {
   const handleLogout = () => {
     setSelectedStudent(null)
     setAvailableEvaluations([])
+    setActiveTab('evaluations')
     localStorage.removeItem('studentSession')
   }
 
@@ -252,7 +277,32 @@ export default function Home() {
           </button>
         </header>
 
+        {/* Navigation Tabs */}
+        <div className="student-tabs" style={{ marginTop: '1.5rem' }}>
+          <button 
+            className={`student-tab ${activeTab === 'evaluations' ? 'active' : ''}`}
+            onClick={() => setActiveTab('evaluations')}
+          >
+            📝 Evaluaciones
+          </button>
+          <button 
+            className={`student-tab ${activeTab === 'history' ? 'active' : ''}`}
+            onClick={() => setActiveTab('history')}
+          >
+            📊 Mi Historial
+          </button>
+          <button 
+            className={`student-tab ${activeTab === 'ranking' ? 'active' : ''}`}
+            onClick={() => setActiveTab('ranking')}
+          >
+            🏆 Ranking del Curso
+          </button>
+        </div>
+
         <main style={{ marginTop: '2rem' }}>
+
+        {activeTab === 'evaluations' && (
+          <>
 
 
           {Object.entries(evaluationsBySubject).length > 0 ? (
@@ -361,6 +411,25 @@ export default function Home() {
               </div>
             </div>
           )}
+          </>
+        )}
+
+        {activeTab === 'history' && (
+          <StudentHistory 
+            evaluations={historyData.evaluations} 
+            games={historyData.games}
+          />
+        )}
+
+        {activeTab === 'ranking' && (
+          <CourseRanking 
+            evalRanking={rankingData.evalRanking} 
+            gameRanking={rankingData.gameRanking} 
+            currentStudentName={selectedStudent.fullName} 
+            courseName={selectedCourse || ''} 
+          />
+        )}
+
         </main>
 
         <footer style={{ marginTop: '4rem', textAlign: 'center', color: 'var(--secondary)', fontSize: '0.8rem' }}>

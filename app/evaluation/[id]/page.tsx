@@ -14,7 +14,7 @@ function EvaluationContent() {
   const listNumberRaw = searchParams.get('listNumber')
   const listNumber = (listNumberRaw && listNumberRaw !== '') ? parseInt(listNumberRaw) : undefined
 
-  const [evaluation, setEvaluation] = useState<{title: string, duration: number, shuffleQuestions?: boolean, questions: {id: string, type: string, points: number, content: string, options: string | null}[]} | null>(null)
+  const [evaluation, setEvaluation] = useState<{title: string, duration: number, isActive?: boolean, shuffleQuestions?: boolean, questions: {id: string, type: string, points: number, content: string, options: string | null, shuffledOptions?: string[]}[]} | null>(null)
   const [answers, setAnswers] = useState<{ [key: string]: string }>({})
   const [timeLeft, setTimeLeft] = useState<number>(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -27,7 +27,19 @@ function EvaluationContent() {
     async function load() {
       const data = await getEvaluationById(id as string)
       if (data) {
-        let qs = [...data.questions]
+        if (!data.isActive) {
+          alert('Esta evaluación no se encuentra activa en este momento.')
+          router.push('/')
+          return
+        }
+
+        let qs = data.questions.map(q => {
+          let shuffledOptions: string[] | undefined = undefined;
+          if (q.type === 'MULTIPLE_CHOICE' && q.options) {
+            shuffledOptions = q.options.split(',').map(o => o.trim()).sort(() => Math.random() - 0.5)
+          }
+          return { ...q, shuffledOptions }
+        })
         if (data.shuffleQuestions) {
           qs = qs.sort(() => Math.random() - 0.5)
         }
@@ -119,8 +131,8 @@ function EvaluationContent() {
             <div style={{ background: '#0f172a', padding: '2rem', borderRadius: '24px', border: '1px solid #334155', marginBottom: '2rem' }}>
               <div style={{ fontSize: '0.9rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '0.5rem' }}>Tu Calificación</div>
               <div style={{ fontSize: '4rem', fontWeight: '800', color: 'var(--primary)' }}>
-                {result.score.toFixed(1)}
-                <span style={{ fontSize: '1.5rem', color: '#334155', marginLeft: '0.5rem' }}>/ {result.totalPossible.toFixed(1)}</span>
+                {Math.round(result.score)}
+                <span style={{ fontSize: '1.5rem', color: '#334155', marginLeft: '0.5rem' }}>/ {Math.round(result.totalPossible)}</span>
               </div>
             </div>
           )}
@@ -192,7 +204,7 @@ function EvaluationContent() {
 
       <main className="container" style={{ padding: '2rem 1rem 6rem' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-          {evaluation.questions.map((q: {id: string, type: string, points: number, content: string, options: string | null}, idx: number) => (
+          {evaluation.questions.map((q: {id: string, type: string, points: number, content: string, options: string | null, shuffledOptions?: string[]}, idx: number) => (
             <section key={q.id} className="section-card" style={{ padding: '2.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                 <span style={{ 
@@ -208,29 +220,29 @@ function EvaluationContent() {
                 {q.content}
               </h3>
 
-              {q.type === 'MULTIPLE_CHOICE' && (
+              {q.type === 'MULTIPLE_CHOICE' && q.shuffledOptions && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  {q.options?.split(',').map((opt: string, i: number) => (
+                  {q.shuffledOptions.map((opt: string, i: number) => (
                     <label 
                       key={i}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '1rem',
                         padding: '1.25rem', borderRadius: '14px', cursor: 'pointer',
-                        background: answers[q.id] === opt.trim() ? 'rgba(99, 102, 241, 0.1)' : '#1e293b',
+                        background: answers[q.id] === opt ? 'rgba(99, 102, 241, 0.1)' : '#1e293b',
                         border: '1px solid', 
-                        borderColor: answers[q.id] === opt.trim() ? 'var(--primary)' : '#334155',
+                        borderColor: answers[q.id] === opt ? 'var(--primary)' : '#334155',
                         transition: 'all 0.2s'
                       }}
                     >
                       <input 
                         type="radio" 
                         name={q.id} 
-                        value={opt.trim()}
-                        checked={answers[q.id] === opt.trim()}
-                        onChange={() => handleAnswerChange(q.id, opt.trim())}
+                        value={opt}
+                        checked={answers[q.id] === opt}
+                        onChange={() => handleAnswerChange(q.id, opt)}
                         style={{ width: '20px', height: '20px', accentColor: 'var(--primary)' }}
                       />
-                      <span style={{ color: answers[q.id] === opt.trim() ? 'white' : '#94a3b8' }}>{opt.trim()}</span>
+                      <span style={{ color: answers[q.id] === opt ? 'white' : '#94a3b8' }}>{opt}</span>
                     </label>
                   ))}
                 </div>

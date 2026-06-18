@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { saveGameScore, getGameConfigs } from '@/app/actions'
@@ -64,7 +64,10 @@ export default function GameContent() {
   const courseName = searchParams.get('course') || ''
 
   const [currentLevel, setCurrentLevel] = useState(1)
-  const [itemsToDrag, setItemsToDrag] = useState<HardwareItem[]>([])
+  const [itemsToDrag, setItemsToDrag] = useState<HardwareItem[]>(() => {
+    const lvl = LEVELS.find(l => l.level === 1)
+    return lvl ? [...lvl.items].sort(() => Math.random() - 0.5) : []
+  })
   const [classifiedItems, setClassifiedItems] = useState<Record<string, HardwareItem[]>>({
     entrada: [],
     salida: [],
@@ -79,24 +82,15 @@ export default function GameContent() {
   const [feedback, setFeedback] = useState<{ text: string, type: 'success' | 'error' } | null>(null)
   const [maxConfiguredPoints, setMaxConfiguredPoints] = useState(45)
 
-  useEffect(() => {
-    if (!studentName || !courseName) {
-      router.push('/')
-      return
-    }
+  const finishGame = useCallback(async (finalErrors?: number) => {
+    setGameFinished(true)
+    const errorsCount = typeof finalErrors === 'number' ? finalErrors : errors
+    const calculatedScore = Math.max(0, maxConfiguredPoints - (errorsCount * (maxConfiguredPoints / 15)))
+    const scaledScore = Math.round(calculatedScore)
+    await saveGameScore('hardware_classification', studentName, courseName, scaledScore, LEVELS.length)
+  }, [errors, maxConfiguredPoints, studentName, courseName])
 
-    async function fetchConfig() {
-      const configs = await getGameConfigs('hardware_classification')
-      const currentConfig = configs.find(c => c.courseName === courseName)
-      if (currentConfig && (currentConfig as any).maxPoints) {
-        setMaxConfiguredPoints((currentConfig as any).maxPoints)
-      }
-    }
-    fetchConfig()
-    loadLevel(1)
-  }, [studentName, courseName, router])
-
-  const loadLevel = (lvlIndex: number) => {
+  const loadLevel = useCallback((lvlIndex: number) => {
     const lvl = LEVELS.find(l => l.level === lvlIndex)
     if (lvl) {
       const shuffled = [...lvl.items].sort(() => Math.random() - 0.5)
@@ -112,15 +106,23 @@ export default function GameContent() {
     } else {
       finishGame()
     }
-  }
+  }, [finishGame])
 
-  const finishGame = async (finalErrors?: number) => {
-    setGameFinished(true)
-    const errorsCount = typeof finalErrors === 'number' ? finalErrors : errors
-    const calculatedScore = Math.max(0, maxConfiguredPoints - (errorsCount * (maxConfiguredPoints / 15)))
-    const scaledScore = Math.round(calculatedScore)
-    await saveGameScore('hardware_classification', studentName, courseName, scaledScore, LEVELS.length)
-  }
+  useEffect(() => {
+    if (!studentName || !courseName) {
+      router.push('/')
+      return
+    }
+
+    async function initGame() {
+      const configs = await getGameConfigs('hardware_classification')
+      const currentConfig = configs.find(c => c.courseName === courseName)
+      if (currentConfig && currentConfig.maxPoints) {
+        setMaxConfiguredPoints(currentConfig.maxPoints)
+      }
+    }
+    initGame()
+  }, [studentName, courseName, router])
 
   const handleDragStart = (e: React.DragEvent, item: HardwareItem) => {
     e.dataTransfer.setData('text/plain', JSON.stringify(item))

@@ -3,13 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getCourses, getGameConfigs, saveAllGameConfigs, getAllGameScores, resetGameScore } from '@/app/actions'
+import { getCourses, getGameConfigs, saveAllGameConfigs } from '@/app/actions'
 
-
-interface Teacher {
-  id: string
-  name: string
-}
 
 interface GameConfigItem {
   id?: string
@@ -19,18 +14,7 @@ interface GameConfigItem {
   maxPoints: number
 }
 
-interface ScoreItem {
-  id: string
-  studentName: string
-  courseName: string
-  score: number
-  levelReached: number
-  attemptsUsed: number
-  completedAt: Date
-}
-
 export default function GamesConfigPage() {
-  const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [courses, setCourses] = useState<string[]>([])
   const [configs, setConfigs] = useState<Record<string, GameConfigItem>>({})
 
@@ -43,14 +27,13 @@ export default function GamesConfigPage() {
 
 
   useEffect(() => {
-    const savedTeacher = localStorage.getItem('teacher')
-    if (!savedTeacher) {
-      router.push('/login')
-      return
-    }
-    setTeacher(JSON.parse(savedTeacher))
+    async function init() {
+      const savedTeacher = localStorage.getItem('teacher')
+      if (!savedTeacher) {
+        router.push('/login')
+        return
+      }
 
-    async function loadData() {
       const [allCourses, savedConfigs] = await Promise.all([
         getCourses(),
         getGameConfigs(gameId)
@@ -67,7 +50,7 @@ export default function GamesConfigPage() {
           courseName: found.courseName,
           maxAttempts: found.maxAttempts,
           isActive: found.isActive,
-          maxPoints: (found as any).maxPoints || 45
+          maxPoints: found.maxPoints || 45
         } : {
           courseName: c,
           maxAttempts: 3,
@@ -79,7 +62,7 @@ export default function GamesConfigPage() {
       setLoading(false)
     }
 
-    loadData()
+    init()
   }, [router])
 
   const handleToggleActive = (courseName: string) => {

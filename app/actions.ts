@@ -189,7 +189,8 @@ export async function getEvaluationsByCourse(courseName: string) {
 
     const evaluationsWithTotal = evaluations.map(ev => ({
       ...ev,
-      totalPossible: ev.questions.reduce((sum, q) => sum + (q.points || 0), 0)
+      results: ev.results.map(r => ({ ...r, score: Math.round(r.score) })),
+      totalPossible: Math.round(ev.questions.reduce((sum, q) => sum + (q.points || 0), 0))
     }))
 
     return evaluationsWithTotal
@@ -335,6 +336,8 @@ export async function submitStudentEvaluation(
       }
     })
 
+    const roundedScore = Math.round(score)
+
     await prisma.studentResult.create({
       data: {
         evaluationId,
@@ -342,14 +345,16 @@ export async function submitStudentEvaluation(
         studentId: null, // Campo opcional pero aseguramos nulo para evitar errores de validación
         courseName,
         listNumber,
-        score: score
+        score: roundedScore
       }
     })
 
+    const totalPossible = Math.round(evaluation.questions.reduce((acc, q) => acc + q.points, 0))
+
     return { 
       success: true, 
-      score, 
-      totalPossible: evaluation.questions.reduce((acc, q) => acc + q.points, 0),
+      score: roundedScore, 
+      totalPossible,
       showScoreAtEnd: evaluation.showScoreAtEnd,
       showCorrectAnswers: evaluation.showCorrectAnswers,
       feedback: questionsWithFeedback
@@ -383,13 +388,13 @@ export async function getTeacherResults(teacherId: string) {
     
     // Calcular el puntaje total posible para cada evaluación
     const resultsWithTotal = results.map(res => {
-      const totalPossible = res.evaluation.questions.reduce((acc, q) => acc + q.points, 0)
+      const totalPossible = Math.round(res.evaluation.questions.reduce((acc, q) => acc + q.points, 0))
       return {
         id: res.id,
         studentName: res.studentName,
         courseName: res.courseName,
         listNumber: res.listNumber,
-        score: res.score,
+        score: Math.round(res.score),
         completedAt: res.completedAt,
         totalPossible,
         evaluation: {
@@ -455,12 +460,6 @@ export async function saveGameConfig(gameId: string, courseName: string, maxAtte
 
 export async function saveAllGameConfigs(gameId: string, configs: { courseName: string, maxAttempts: number, isActive: boolean, maxPoints: number }[]) {
   try {
-    try {
-      await prisma.$executeRawUnsafe('ALTER TABLE GameConfig ADD COLUMN maxPoints INTEGER DEFAULT 45')
-    } catch (e) {
-      // Ignorar si la columna ya existe
-    }
-
     for (const conf of configs) {
       const existing = await prisma.gameConfig.findFirst({
         where: { gameId, courseName: conf.courseName }
@@ -553,7 +552,9 @@ export async function getAllGameScores(gameId: string) {
     console.error('Error fetching game scores:', error)
     return []
   }
-}export async function resetGameScore(gameId: string, studentName: string, courseName: string) {
+}
+
+export async function resetGameScore(gameId: string, studentName: string, courseName: string) {
   try {
     await prisma.gameScore.deleteMany({
       where: { gameId, studentName, courseName }
@@ -562,5 +563,131 @@ export async function getAllGameScores(gameId: string) {
   } catch (error) {
     console.error('Error resetting game score:', error)
     return { success: false, error: 'Error al reiniciar la puntuación.' }
+  }
+}
+
+export async function getStudentHistory(studentName: string, courseName: string) {
+  try {
+    // Evaluation results
+    const evalResults = await prisma.studentResult.findMany({
+      where: { studentName, courseName },
+      include: {
+        evaluation: {
+          include: {
+            questions: { select: { points: true } },
+            teacher: { select: { name: true, subject: true } }
+          }
+        }
+      },
+      orderBy: { completedAt: 'desc' }
+    })
+
+    const evaluations = evalResults.map(r => ({
+      id: r.id,
+      evaluationTitle: r.evaluation.title,
+      teacherName: r.evaluation.teacher.name,
+      subject: r.evaluation.teacher.subject || 'General',
+      score: Math.round(r.score),
+      totalPossible: Math.round(r.evaluation.questions.reduce((sum, q) => sum + q.points, 0)),
+      completedAt: r.completedAt.toISOString()
+    }))
+
+    // Game scores
+    const gameScores = await prisma.gameScore.findMany({
+      where: { studentName, courseName },
+      orderBy: { completedAt: 'desc' }
+    })
+
+    const games = gameScores.map(gs => ({
+      id: gs.id,
+      gameId: gs.gameId,
+      score: gs.score,
+      levelReached: gs.levelReached,
+      attemptsUsed: gs.attemptsUsed,
+      completedAt: gs.completedAt.toISOString()
+    }))
+
+    return { evaluations, games }
+  } catch (error) {
+    console.error('Error fetching student history:', error)
+    return { evaluations: [], games: [] }
+  }
+}
+
+export async function getCourseRanking(courseName: string) {
+  try {
+    // --- Evaluation ranking ---
+    // Get all results for this course
+    const allEvalResults = await prisma.studentResult.findMany({
+      where: { courseName },
+      include: {
+        evaluation: {
+          include: { questions: { select: { points: true } } }
+        }
+      }
+    })
+
+    // Group by student and compute average percentage
+    const evalByStudent: Record<string, { totalPercent: number, count: number, listNumber: number | null }> = {}
+    for (const r of allEvalResults) {
+      const totalPossible = r.evaluation.questions.reduce((sum, q) => sum + q.points, 0)
+      const percent = totalPossible > 0 ? (r.score / totalPossible) * 100 : 0
+
+      if (!evalByStudent[r.studentName]) {
+        evalByStudent[r.studentName] = { totalPercent: 0, count: 0, listNumber: r.listNumber }
+      }
+      evalByStudent[r.studentName].totalPercent += percent
+      evalByStudent[r.studentName].count += 1
+    }
+
+    const evalRanking = Object.entries(evalByStudent)
+      .map(([name, data]) => ({
+        studentName: name,
+        listNumber: data.listNumber,
+        averagePercent: Math.round(data.totalPercent / data.count),
+        evaluationsCompleted: data.count
+      }))
+      .sort((a, b) => b.averagePercent - a.averagePercent)
+
+    // --- Game ranking ---
+    const allGameScores = await prisma.gameScore.findMany({
+      where: { courseName },
+      orderBy: { score: 'desc' }
+    })
+
+    // Enrich with listNumber
+    const gameRanking = await Promise.all(
+      allGameScores.map(async (gs) => {
+        const student = await prisma.student.findFirst({
+          where: { fullName: gs.studentName, course: gs.courseName }
+        })
+        return {
+          studentName: gs.studentName,
+          listNumber: student?.listNumber ?? null,
+          score: gs.score,
+          levelReached: gs.levelReached,
+          attemptsUsed: gs.attemptsUsed,
+          gameId: gs.gameId
+        }
+      })
+    )
+
+    return { evalRanking, gameRanking }
+  } catch (error) {
+    console.error('Error fetching course ranking:', error)
+    return { evalRanking: [], gameRanking: [] }
+  }
+}
+
+export async function toggleEvaluationStatus(evaluationId: string, isActive: boolean) {
+  try {
+    const updated = await prisma.evaluation.update({
+      where: { id: evaluationId },
+      data: { isActive }
+    })
+    return { success: true, isActive: updated.isActive }
+  } catch (error) {
+    console.error('Error toggling evaluation status:', error)
+    return { success: false, error: 'Error al cambiar el estado de la evaluación.' }
   }
 }

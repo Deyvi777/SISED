@@ -5,11 +5,6 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { getCourses, getStudentsDetailedByCourse } from '@/app/actions'
 
-interface Teacher {
-  id: string
-  name: string
-}
-
 interface Student {
   id: string
   fullName: string
@@ -22,7 +17,6 @@ interface Student {
 }
 
 export default function StudentsPage() {
-  const [teacher, setTeacher] = useState<Teacher | null>(null)
   const [courses, setCourses] = useState<string[]>([])
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
   const [students, setStudents] = useState<Student[]>([])
@@ -31,21 +25,19 @@ export default function StudentsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const savedTeacher = localStorage.getItem('teacher')
-    if (!savedTeacher) {
-      router.push('/login')
-      return
-    }
-    
-    setTeacher(JSON.parse(savedTeacher))
+    async function init() {
+      const savedTeacher = localStorage.getItem('teacher')
+      if (!savedTeacher) {
+        router.push('/login')
+        return
+      }
 
-    async function loadCourses() {
       const availableCourses = await getCourses()
       setCourses(availableCourses)
       setLoading(false)
     }
 
-    loadCourses()
+    init()
   }, [router])
 
   useEffect(() => {

@@ -95,9 +95,6 @@ export default function ResultsPage() {
     init()
   }, [router])
 
-  useEffect(() => {
-    setSelectedCourse('all')
-  }, [selectedEvaluationId, selectedGameId, activeTab])
 
   // Evaluaciones filters
   const evalResults = selectedEvaluationId === ''
@@ -144,13 +141,8 @@ export default function ResultsPage() {
   })
 
   const sortedGameResults = [...filteredGameResults].sort((a, b) => {
-    let valA: any = a[sortBy]
-    let valB: any = b[sortBy]
-    
-    if (sortBy === 'listNumber') {
-      valA = valA ?? 999
-      valB = valB ?? 999
-    }
+    const valA: number = a[sortBy] ?? 999
+    const valB: number = b[sortBy] ?? 999
     
     if (sortOrder === 'asc') {
       return valA > valB ? 1 : -1
@@ -198,9 +190,9 @@ export default function ResultsPage() {
         'Estudiante': r.studentName,
         'Nro. Lista': r.listNumber || '-',
         'Curso': r.courseName || '-',
-        'Puntaje': r.score.toFixed(1),
-        'Puntaje Total': r.totalPossible.toFixed(1),
-        'Porcentaje': `${((r.score / r.totalPossible) * 100).toFixed(1)}%`,
+        'Puntaje': Math.round(r.score),
+        'Puntaje Total': Math.round(r.totalPossible),
+        'Porcentaje': `${Math.round((r.score / r.totalPossible) * 100)}%`,
         'Fecha': new Date(r.completedAt).toLocaleString()
       }))
 
@@ -224,7 +216,7 @@ export default function ResultsPage() {
         'Nro. Lista': r.listNumber || '-',
         'Estudiante': r.studentName,
         'Curso': r.courseName || '-',
-        'Mejor Puntaje': r.score,
+        'Mejor Puntaje': Math.round(r.score),
         'Nivel Máximo': r.levelReached,
         'Intentos Usados': r.attemptsUsed,
         'Fecha': new Date(r.completedAt).toLocaleString()
@@ -452,10 +444,10 @@ export default function ResultsPage() {
                                   color: res.score >= (res.totalPossible / 2) ? '#10b981' : '#ef4444',
                                   fontSize: '1.1rem'
                                 }}>
-                                  {res.score.toFixed(1)}
+                                  {Math.round(res.score)}
                                 </span>
                                 <span style={{ color: 'var(--secondary)', fontSize: '0.8rem' }}>
-                                  / {res.totalPossible}
+                                  / {Math.round(res.totalPossible)}
                                 </span>
                               </div>
                             </td>
@@ -614,7 +606,7 @@ export default function ResultsPage() {
                               </span>
                             </td>
                             <td style={{ color: '#10b981', fontWeight: 'bold', fontSize: '1.1rem' }}>
-                              {res.score} pts
+                              {Math.round(res.score)} pts
                             </td>
                             <td>Nivel {res.levelReached}</td>
                             <td style={{ color: 'var(--secondary)' }}>{res.attemptsUsed}</td>

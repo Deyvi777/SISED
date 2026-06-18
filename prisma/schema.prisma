@@ -41,6 +41,7 @@ model Evaluation {
   showScoreAtEnd        Boolean            @default(true)
   showCorrectAnswers    Boolean            @default(false)
   shuffleQuestions      Boolean            @default(false)
+  isActive              Boolean            @default(true)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   teacher               Teacher            @relation(fields: [teacherId], references: [id])

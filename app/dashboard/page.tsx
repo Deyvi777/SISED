@@ -39,7 +39,6 @@ export default function Dashboard() {
       }
     }
     init()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router])
 
   const handleLogout = () => {
